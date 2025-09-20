@@ -4,7 +4,7 @@ export interface ContextMcpConfig {
     name: string;
     version: string;
     // Embedding provider configuration
-    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama';
+    embeddingProvider: 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'LlamaCpp';
     embeddingModel: string;
     // Provider-specific API keys
     openaiApiKey?: string;
@@ -15,6 +15,11 @@ export interface ContextMcpConfig {
     // Ollama configuration
     ollamaModel?: string;
     ollamaHost?: string;
+    // LlamaCpp configuration
+    llamacppHost?: string;
+    llamacppModel?: string;
+    llamacppTimeout?: number;
+    llamacppCodePrefix?: boolean;
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
@@ -78,6 +83,8 @@ export function getDefaultModelForProvider(provider: string): string {
             return 'gemini-embedding-001';
         case 'Ollama':
             return 'nomic-embed-text';
+        case 'LlamaCpp':
+            return 'nomic-embed-code';
         default:
             return 'text-embedding-3-small';
     }
@@ -91,6 +98,11 @@ export function getEmbeddingModelForProvider(provider: string): string {
             const ollamaModel = envManager.get('OLLAMA_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
             console.log(`[DEBUG] 🎯 Ollama model selection: OLLAMA_MODEL=${envManager.get('OLLAMA_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${ollamaModel}`);
             return ollamaModel;
+        case 'LlamaCpp':
+            // For LlamaCpp, prioritize LLAMACPP_MODEL over EMBEDDING_MODEL
+            const llamacppModel = envManager.get('LLAMACPP_MODEL') || envManager.get('EMBEDDING_MODEL') || getDefaultModelForProvider(provider);
+            console.log(`[DEBUG] 🎯 LlamaCpp model selection: LLAMACPP_MODEL=${envManager.get('LLAMACPP_MODEL') || 'NOT SET'}, EMBEDDING_MODEL=${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}, selected=${llamacppModel}`);
+            return llamacppModel;
         case 'OpenAI':
         case 'VoyageAI':
         case 'Gemini':
@@ -108,6 +120,8 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   EMBEDDING_PROVIDER: ${envManager.get('EMBEDDING_PROVIDER') || 'NOT SET'}`);
     console.log(`[DEBUG]   EMBEDDING_MODEL: ${envManager.get('EMBEDDING_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
+    console.log(`[DEBUG]   LLAMACPP_MODEL: ${envManager.get('LLAMACPP_MODEL') || 'NOT SET'}`);
+    console.log(`[DEBUG]   LLAMACPP_HOST: ${envManager.get('LLAMACPP_HOST') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
@@ -117,7 +131,7 @@ export function createMcpConfig(): ContextMcpConfig {
         name: envManager.get('MCP_SERVER_NAME') || "Context MCP Server",
         version: envManager.get('MCP_SERVER_VERSION') || "1.0.0",
         // Embedding provider configuration
-        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama') || 'OpenAI',
+        embeddingProvider: (envManager.get('EMBEDDING_PROVIDER') as 'OpenAI' | 'VoyageAI' | 'Gemini' | 'Ollama' | 'LlamaCpp') || 'OpenAI',
         embeddingModel: getEmbeddingModelForProvider(envManager.get('EMBEDDING_PROVIDER') || 'OpenAI'),
         // Provider-specific API keys
         openaiApiKey: envManager.get('OPENAI_API_KEY'),
@@ -128,6 +142,11 @@ export function createMcpConfig(): ContextMcpConfig {
         // Ollama configuration
         ollamaModel: envManager.get('OLLAMA_MODEL'),
         ollamaHost: envManager.get('OLLAMA_HOST'),
+        // LlamaCpp configuration
+        llamacppHost: envManager.get('LLAMACPP_HOST'),
+        llamacppModel: envManager.get('LLAMACPP_MODEL'),
+        llamacppTimeout: envManager.get('LLAMACPP_TIMEOUT') ? parseInt(envManager.get('LLAMACPP_TIMEOUT')!, 10) : undefined,
+        llamacppCodePrefix: envManager.get('LLAMACPP_CODE_PREFIX') ? envManager.get('LLAMACPP_CODE_PREFIX') === 'true' : undefined,
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
         milvusToken: envManager.get('MILVUS_TOKEN')
@@ -166,6 +185,14 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
             console.log(`[MCP]   Ollama Host: ${config.ollamaHost || 'http://127.0.0.1:11434'}`);
             console.log(`[MCP]   Ollama Model: ${config.embeddingModel}`);
             break;
+        case 'LlamaCpp':
+            console.log(`[MCP]   LlamaCpp Host: ${config.llamacppHost || 'http://localhost:8080'}`);
+            console.log(`[MCP]   LlamaCpp Model: ${config.embeddingModel}`);
+            if (config.llamacppTimeout) {
+                console.log(`[MCP]   LlamaCpp Timeout: ${config.llamacppTimeout}ms`);
+            }
+            console.log(`[MCP]   LlamaCpp Code Prefix: ${config.llamacppCodePrefix !== false ? '✅ Enabled' : '❌ Disabled'}`);
+            break;
     }
 
     console.log(`[MCP] 🔧 Initializing server components...`);
@@ -185,19 +212,25 @@ Environment Variables:
   MCP_SERVER_VERSION      Server version
   
   Embedding Provider Configuration:
-  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama (default: OpenAI)
+  EMBEDDING_PROVIDER      Embedding provider: OpenAI, VoyageAI, Gemini, Ollama, LlamaCpp (default: OpenAI)
   EMBEDDING_MODEL         Embedding model name (works for all providers)
-  
+
   Provider-specific API Keys:
   OPENAI_API_KEY          OpenAI API key (required for OpenAI provider)
   OPENAI_BASE_URL         OpenAI API base URL (optional, for custom endpoints)
   VOYAGEAI_API_KEY        VoyageAI API key (required for VoyageAI provider)
   GEMINI_API_KEY          Google AI API key (required for Gemini provider)
   GEMINI_BASE_URL         Gemini API base URL (optional, for custom endpoints)
-  
+
   Ollama Configuration:
   OLLAMA_HOST             Ollama server host (default: http://127.0.0.1:11434)
   OLLAMA_MODEL            Ollama model name (alternative to EMBEDDING_MODEL for Ollama)
+
+  LlamaCpp Configuration:
+  LLAMACPP_HOST           LlamaCpp server host (default: http://localhost:8080)
+  LLAMACPP_MODEL          LlamaCpp model name (alternative to EMBEDDING_MODEL for LlamaCpp)
+  LLAMACPP_TIMEOUT        Request timeout in milliseconds (default: 30000)
+  LLAMACPP_CODE_PREFIX    Enable automatic code prefix for embeddings (default: true)
   
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
@@ -221,5 +254,11 @@ Examples:
   
   # Start MCP server with Ollama and specific model (using EMBEDDING_MODEL)
   EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with LlamaCpp and nomic-embed-code model
+  EMBEDDING_PROVIDER=LlamaCpp LLAMACPP_HOST=http://localhost:8080 LLAMACPP_MODEL=nomic-embed-code MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with LlamaCpp and custom timeout (useful for slower hardware)
+  EMBEDDING_PROVIDER=LlamaCpp LLAMACPP_TIMEOUT=60000 EMBEDDING_MODEL=nomic-embed-code MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
         `);
 } 
