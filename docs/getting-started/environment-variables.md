@@ -20,7 +20,7 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 ### Embedding Provider
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama` | `OpenAI` |
+| `EMBEDDING_PROVIDER` | Provider: `OpenAI`, `VoyageAI`, `Gemini`, `Ollama`, `LlamaCpp` | `OpenAI` |
 | `EMBEDDING_MODEL` | Embedding model name (works for all providers) | Provider-specific default |
 | `OPENAI_API_KEY` | OpenAI API key | Required for OpenAI |
 | `OPENAI_BASE_URL` | OpenAI API base URL (optional, for custom endpoints) | `https://api.openai.com/v1` |
@@ -53,6 +53,14 @@ Claude Context supports a global configuration file at `~/.context/.env` to simp
 |----------|-------------|---------|
 | `OLLAMA_HOST` | Ollama server URL | `http://127.0.0.1:11434` |
 | `OLLAMA_MODEL`(alternative to `EMBEDDING_MODEL`) | Model name |  |
+
+### LlamaCpp (Optional)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LLAMACPP_HOST` | LlamaCpp server URL | `http://localhost:8080` |
+| `LLAMACPP_MODEL` (alternative to `EMBEDDING_MODEL`) | Model name |  |
+| `LLAMACPP_TIMEOUT` | Request timeout in milliseconds | `30000` |
+| `LLAMACPP_CODE_PREFIX` | Enable automatic code prefix for embeddings | `true` |
 
 
 ### Advanced Configuration
