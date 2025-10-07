@@ -23,6 +23,9 @@ export interface ContextMcpConfig {
     // Vector database configuration
     milvusAddress?: string; // Optional, can be auto-resolved from token
     milvusToken?: string;
+    milvusCollectionName?: string; // Optional, customizable collection name
+    // Collection naming configuration
+    embeddingStrictCollectionNames?: boolean; // Whether to include provider/model in collection names
 }
 
 // Legacy format (v1) - for backward compatibility
@@ -122,9 +125,14 @@ export function createMcpConfig(): ContextMcpConfig {
     console.log(`[DEBUG]   OLLAMA_MODEL: ${envManager.get('OLLAMA_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   LLAMACPP_MODEL: ${envManager.get('LLAMACPP_MODEL') || 'NOT SET'}`);
     console.log(`[DEBUG]   LLAMACPP_HOST: ${envManager.get('LLAMACPP_HOST') || 'NOT SET'}`);
+    console.log(`[DEBUG]   LLAMACPP_TIMEOUT: ${envManager.get('LLAMACPP_TIMEOUT') || 'NOT SET'}`);
+    console.log(`[DEBUG]   LLAMACPP_CODE_PREFIX: ${envManager.get('LLAMACPP_CODE_PREFIX') || 'NOT SET'}`);
     console.log(`[DEBUG]   GEMINI_API_KEY: ${envManager.get('GEMINI_API_KEY') ? 'SET (length: ' + envManager.get('GEMINI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   OPENAI_API_KEY: ${envManager.get('OPENAI_API_KEY') ? 'SET (length: ' + envManager.get('OPENAI_API_KEY')!.length + ')' : 'NOT SET'}`);
     console.log(`[DEBUG]   MILVUS_ADDRESS: ${envManager.get('MILVUS_ADDRESS') || 'NOT SET'}`);
+    console.log(`[DEBUG]   MILVUS_TOKEN: ${envManager.get('MILVUS_TOKEN') ? 'SET (length: ' + envManager.get('MILVUS_TOKEN')!.length + ')' : 'NOT SET'}`);
+    console.log(`[DEBUG]   MILVUS_COLLECTION_NAME: ${envManager.get('MILVUS_COLLECTION_NAME') || 'NOT SET'}`);
+    console.log(`[DEBUG]   EMBEDDING_STRICT_COLLECTION_NAMES: ${envManager.get('EMBEDDING_STRICT_COLLECTION_NAMES') || 'NOT SET'}`);
     console.log(`[DEBUG]   NODE_ENV: ${envManager.get('NODE_ENV') || 'NOT SET'}`);
 
     const config: ContextMcpConfig = {
@@ -149,7 +157,10 @@ export function createMcpConfig(): ContextMcpConfig {
         llamacppCodePrefix: envManager.get('LLAMACPP_CODE_PREFIX') ? envManager.get('LLAMACPP_CODE_PREFIX') === 'true' : undefined,
         // Vector database configuration - address can be auto-resolved from token
         milvusAddress: envManager.get('MILVUS_ADDRESS'), // Optional, can be resolved from token
-        milvusToken: envManager.get('MILVUS_TOKEN')
+        milvusToken: envManager.get('MILVUS_TOKEN'),
+        milvusCollectionName: envManager.get('MILVUS_COLLECTION_NAME'), // Optional, customizable collection name
+        // Collection naming configuration
+        embeddingStrictCollectionNames: envManager.get('EMBEDDING_STRICT_COLLECTION_NAMES')?.toLowerCase() === 'true'
     };
 
     return config;
@@ -163,6 +174,8 @@ export function logConfigurationSummary(config: ContextMcpConfig): void {
     console.log(`[MCP]   Embedding Provider: ${config.embeddingProvider}`);
     console.log(`[MCP]   Embedding Model: ${config.embeddingModel}`);
     console.log(`[MCP]   Milvus Address: ${config.milvusAddress || (config.milvusToken ? '[Auto-resolve from token]' : '[Not configured]')}`);
+    console.log(`[MCP]   Milvus Collection: ${config.milvusCollectionName || '[Default: based on provider]'}`);
+    console.log(`[MCP]   Strict Collection Names: ${config.embeddingStrictCollectionNames ? 'Enabled (provider+model)' : 'Disabled (legacy)'}`);
 
     // Log provider-specific configuration without exposing sensitive data
     switch (config.embeddingProvider) {
@@ -235,6 +248,10 @@ Environment Variables:
   Vector Database Configuration:
   MILVUS_ADDRESS          Milvus address (optional, can be auto-resolved from token)
   MILVUS_TOKEN            Milvus token (optional, used for authentication and address resolution)
+  MILVUS_COLLECTION_NAME  Custom collection name (optional, defaults to provider-based name)
+
+  Collection Naming Configuration:
+  EMBEDDING_STRICT_COLLECTION_NAMES  Use strict collection naming with provider+model (default: false)
 
 Examples:
   # Start MCP server with OpenAI (default) and explicit Milvus address
@@ -260,5 +277,11 @@ Examples:
 
   # Start MCP server with LlamaCpp and custom timeout (useful for slower hardware)
   EMBEDDING_PROVIDER=LlamaCpp LLAMACPP_TIMEOUT=60000 EMBEDDING_MODEL=nomic-embed-code MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with strict collection naming (prevents provider conflicts)
+  EMBEDDING_PROVIDER=Ollama EMBEDDING_MODEL=nomic-embed-text EMBEDDING_STRICT_COLLECTION_NAMES=true MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
+
+  # Start MCP server with LlamaCpp and strict collection naming
+  EMBEDDING_PROVIDER=LlamaCpp EMBEDDING_MODEL=nomic-embed-code EMBEDDING_STRICT_COLLECTION_NAMES=true MILVUS_TOKEN=your-token npx @zilliz/claude-context-mcp@latest
         `);
 } 

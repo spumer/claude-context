@@ -297,6 +297,10 @@ export class LlamaCppEmbedding extends Embedding {
         return 'LlamaCpp';
     }
 
+    getModel(): string {
+        return this.config.model || 'nomic-embed-code';
+    }
+
     /**
      * Ensure dimension is detected before making embedding requests
      */
