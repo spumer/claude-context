@@ -228,6 +228,30 @@ CUSTOM_IGNORE_PATTERNS=temp/**,*.backup,private/**,uploads/**
 
 These settings work in combination with tool parameters - patterns from both sources will be merged together.
 
+#### Collection Naming Configuration (Optional)
+
+You can configure how collection names are generated to prevent conflicts when using multiple embedding providers:
+
+```bash
+# Use strict collection naming that includes provider and model info
+# This prevents data conflicts when switching between providers
+EMBEDDING_STRICT_COLLECTION_NAMES=true
+
+# Or set a custom collection name manually (overrides all automatic naming)
+MILVUS_COLLECTION_NAME=my_custom_collection
+```
+
+**Collection Naming Modes:**
+- **Legacy mode** (default, `EMBEDDING_STRICT_COLLECTION_NAMES=false`):
+  - Format: `hybrid_code_chunks_<hash>`
+  - Same collection name for all providers (may cause conflicts)
+
+- **Strict mode** (`EMBEDDING_STRICT_COLLECTION_NAMES=true`):
+  - Format: `hybrid_<provider>_<model>_<hash>_<unique>`
+  - Example: `hybrid_ollama_nomic_embed_text_abc12345_def67890`
+  - Prevents conflicts when switching between Ollama, LlamaCpp, OpenAI, etc.
+  - **Recommended** when experimenting with multiple embedding providers
+
 ## Usage with MCP Clients
 
 <details>
